@@ -2090,11 +2090,11 @@ import json
 import lz4.block._block as lz4
 raw = data
 # aw = lz4.decompress(data[16:], 0xFFFFF)
-with open(r"C:\Users\samue\PycharmProjects\ServerDatabase\blkEditor\testFiles\top1000.bin", "rb") as f:
-     raw = f.read()
+# with open(r"C:\Users\samue\PycharmProjects\ServerDatabase\blkEditor\testFiles\top1000.bin", "rb") as f:
+#      raw = f.read()
 print(json.dumps(BlkDecoder(raw).to_dict(), indent=4))
-with open("output.json", "w") as f:
-    f.write(json.dumps(BlkDecoder(raw).to_dict(), indent=4))
+# with open("output.json", "w") as f:
+#     f.write(json.dumps(BlkDecoder(raw).to_dict(), indent=4))
 # print(json.dumps(BlkDecoder(data2).to_dict(), indent=4))
 
 # start = time.time()

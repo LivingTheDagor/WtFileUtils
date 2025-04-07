@@ -97,7 +97,7 @@ class DataHandler:
         return payload
 
 
-class BitStream:
+class BitStream(io.RawIOBase):
     def __init__(self, data, bit_index=0, do_im_hex=False, write_stream=None):
         self.data = data
         self.current_bit_index = bit_index
@@ -134,6 +134,14 @@ class BitStream:
             out_buff[math.ceil(bit_count / 8)-1] = out_buff[math.ceil(bit_count / 8)-1] >>(8-write_bit % 8)
         return out_buff
 
+    def read(self, size = -1, /):
+        if size != -1:
+            return self.fetch(size*8)
+        return self.get_rest()
+
+    def readall(self):
+        return self.get_rest()
+
     def advance(self, bit_count, desc="_") -> None:
         if self.do_im_hex:
             add = 0 if self.current_bit_index % 8 == 0 or bit_count == 0 else 1
@@ -167,6 +175,21 @@ class BitStream:
             shift += 7
             count += 1
         return value
+
+    def decode_uleb128_bytes(self, desc="_", max=100):
+        value = 0
+        shift = 0
+        count = 0
+        payload = bytearray()
+        while max > count:
+            byte = self.fetch(8, desc=f"ULEB{desc}")[0]
+            payload.append(byte)
+            value |= (byte & 0x7f) << shift
+            if not (byte & 0x80):
+                break
+            shift += 7
+            count += 1
+        return value, payload
 
     def get_rest(self, desc="_"):
         EOL_length = len(self.data)-self.current_bit_index // 8 # gets the floor to get the rounded down byte index

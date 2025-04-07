@@ -13,6 +13,12 @@ class FileType:
         0x04: "SLIM_ZSTD",  # Same as slim but zstd compressed
         0x05: "SLIM_ZSTD_DICT",  # Same as SLIM_ZSTD, but with an external ZSTD Dict
     }
+    BBF = 0x00
+    FAT = 0x01
+    FAT_ZSTD = 0x02
+    SLIM = 0x03
+    SLIM_ZSTD = 0x04
+    SLIM_ZSTD_DICT = 0x05
 
     def __init__(self, byte_):
         self.type_byte = byte_

@@ -2,12 +2,13 @@ import abc
 
 
 class WriteStream:
-    def __init__(self, writepath=None):
+    def __init__(self, writepath=None, print=True):
         self.writepath = writepath
+        self.print = print
         self.buffer = []
 
     def write(self, data):
-        if self.writepath is None:
+        if self.print is True:
             print(data)
         else:
             self.buffer.append(data)
@@ -18,3 +19,5 @@ class WriteStream:
                 for data in self.buffer:
                     f.write(data)
                     f.write("\n")
+        else:
+            print('\n'.join(self.buffer))
