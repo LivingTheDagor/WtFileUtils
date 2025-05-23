@@ -1,4 +1,4 @@
-from WtFileUtils.vromfs.VROMFs import VROMFs
+from WtFileUtils.vromfs_test.VROMFs import VROMFs
 from WtFileUtils.FileSystem.FSDirectory import FSDirectory
 from WtFileUtils.FileSystem.FileSystemQuery import MassFileSystemQuery
 import os
@@ -66,7 +66,7 @@ def lookup(wt_install_path, data_to_lookup, filename_include=None, filename_excl
     you can apply filters to the searched files based on name and path
     for all searches, if you supply a compiled re (re.Pattern) object, it will do a re match instead of a (if x in y) match
     all files are bytes, not strings, so you must use b""
-
+    probably not finished
     :param wt_install_path: the warthunder installation path
     :param data_to_lookup: what value(s) to look up in the file
     :param filename_include:
@@ -131,5 +131,5 @@ def dump_individual_vromfs(wt_install_path, out_dir, to_include):
 
 if __name__ == '__main__':
     path = r"D:\SteamLibrary\steamapps\common\War Thunder"
-    # dump_all(path, "dump", silent=True)
+    dump_all(path, "dump", silent=True)
     # dump_individual_vromfs(path, "dump2", "")

@@ -6,7 +6,7 @@ import csv
 from itertools import batched
 
 
-from ..DataHandler import DataHandler
+from ..BitStreama import DataHandler
 from ..vromfs.FileInfoUtils import HeaderType, PlatformType, Packing, Version
 from ..Exceptions import VROMFSException
 from ..FileSystem.FSDirectory import FSDirectory

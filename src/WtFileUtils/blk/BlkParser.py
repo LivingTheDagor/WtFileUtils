@@ -4,7 +4,7 @@ from ..blk.FileInfo import FileType
 from ..blk.Block import Block
 from ..blk.Chunk import ChunkParser
 from ..blk.ParamParser import BLKTypes
-from ..DataHandler import BitStream
+from ..BitStreama import BitStream
 
 
 class BlkParser:
@@ -22,7 +22,7 @@ class BlkParser:
             dat = BitStream(dat)
         dat.advance(offset * 8)
         self.data = None
-        self.blkType = FileType(dat.fetch(8, "blk_type")[0])  # gets blk type, the first byte
+        self.blkType = FileType(dat.ReadBits(8, "blk_type")[0])  # gets blk type, the first byte
         if self.blkType == FileType.BBF:
             raise Exception("BLK is invalid type BBF")
         if not self.blkType.is_zstd():
@@ -49,7 +49,7 @@ class BlkParser:
         else:
             self.name_map_size = self.data.decode_uleb128("name_map_size")  # gets the size of the name map
             self.names = [x.decode("utf-8") for x in
-                          self.data.fetch((self.name_map_size - 1) * 8, "names").split(b"\x00")]
+                          self.data.ReadBits((self.name_map_size - 1) * 8, "names").split(b"\x00")]
             # print(self.names)
             self.data.advance(8)  # it only fetches size - 1 for speed to reduce slicing
             if len(self.names) != self.names_in_name_map:
@@ -57,7 +57,7 @@ class BlkParser:
         self.num_of_blocks = self.data.decode_uleb128("num_of_blocks")
         self.num_of_params = self.data.decode_uleb128("num_of_params")
         self.params_data_size = self.data.decode_uleb128("param_data_size")
-        self.params_data = self.data.fetch(self.params_data_size * 8, "param_data")  # used later on, data
+        self.params_data = self.data.ReadBits(self.params_data_size * 8, "param_data")  # used later on, data
         '''
         here we are are skipping results creation and starting with chunks
         assume we are doing let chunks
@@ -65,7 +65,7 @@ class BlkParser:
         chunks = []
         parser = ChunkParser(self.names, BLKTypes(self.names, self.params_data))
         for i in range(self.num_of_params):
-            chunks.append(parser.parse(self.data.fetch(8 * 8, "chunk")))
+            chunks.append(parser.parse(self.data.ReadBits(8 * 8, "chunk")))
 
         # chunks = Chunks(self.data, self.num_of_params, self.names, B)
         blocks = []
@@ -127,7 +127,7 @@ class BlkBytes:
             dat = BitStream(dat)
         dat.advance(offset * 8)
         self.data = None
-        x = dat.fetch(8, "blk_type")
+        x = dat.ReadBits(8, "blk_type")
         self.blkType = FileType(x[0])  # gets blk type, the first byte
         self.bytes.extend(x)
         if self.blkType == FileType.BBF:
@@ -152,7 +152,7 @@ class BlkBytes:
             self.bytes += temp
 
             # self.names = [x.decode("utf-8") for x in self.data.fetch(self.name_map_size - 1).split(b"\x00")]
-            self.bytes += self.data.fetch(self.name_map_size * 8)
+            self.bytes += self.data.ReadBits(self.name_map_size * 8)
             # print(self.names)
             # self.data.advance(1)
             # if len(self.names) != self.names_in_name_map:
@@ -165,7 +165,7 @@ class BlkBytes:
         self.params_data_size, temp = self.data.decode_uleb128_bytes()
         self.bytes += temp
         # self.params_data = self.data.fetch(self.params_data_size)  # used later on, data
-        self.bytes += self.data.fetch(self.params_data_size * 8)
+        self.bytes += self.data.ReadBits(self.params_data_size * 8)
         '''
         here we are are skipping results creation and starting with chunks
         assume we are doing let chunks
@@ -174,7 +174,7 @@ class BlkBytes:
         # parser = ChunkParser(self.names, BLKTypes(self.names, self.params_data))
         # for i in range(self.num_of_params):
         #     chunks.append(parser.parse(self.data.fetch(8)))
-        self.bytes += self.data.fetch(self.num_of_params * 8 * 8)
+        self.bytes += self.data.ReadBits(self.num_of_params * 8 * 8)
         # chunks = Chunks(self.data, self.num_of_params, self.names, B)
         # blocks = []
         for i in range(self.num_of_blocks):  # this creates all the blocks
