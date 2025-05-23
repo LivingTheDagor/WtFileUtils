@@ -4,7 +4,7 @@ from ..blk.FileInfo import FileType
 from ..blk.Block import Block
 from ..blk.Chunk import ChunkParser
 from ..blk.ParamParser import BLKTypes
-from ..DataHandler import BitStream
+from ..BitStream import BitStream
 
 
 class BlkParser:
@@ -20,9 +20,9 @@ class BlkParser:
     def __init__(self, dat, offset=0, name_map: list[bytearray] = None, zstd_dict=None):
         if not isinstance(dat, BitStream):
             dat = BitStream(dat)
-        dat.advance(offset * 8)
+        dat.IgnoreBytes(offset)
         self.data = None
-        self.blkType = FileType(dat.fetch(8, "blk_type")[0])  # gets blk type, the first byte
+        self.blkType = FileType(dat.ReadBits(8, "blk_type")[0])  # gets blk type, the first byte
         if self.blkType == FileType.BBF:
             raise Exception("BLK is invalid type BBF")
         if not self.blkType.is_zstd():
@@ -31,10 +31,15 @@ class BlkParser:
             if self.blkType.needs_dict():
                 if zstd_dict is None:
                     raise Exception("zstd dict is required")
-            x = zstd.ZstdDecompressor(zstd_dict).stream_reader(dat)
+            # print(dat.read(8).hex())
+            # input()
+            # print(dat.GetData())
+            x = zstd.ZstdDecompressor(zstd_dict).stream_reader(dat) # bitstream doesnt implement RawIO, but it has the needed .read() func
+
             self.data = BitStream(x.read())
+
             x.close()
-        self.names_in_name_map = self.data.decode_uleb128(
+        self.names_in_name_map = self.data.ReadUleb(
             "names_in_name_map")  # gets the number of names in the name map
         self.names = None
         if self.blkType.is_slim():
@@ -47,17 +52,17 @@ class BlkParser:
                 except UnicodeDecodeError:
                     self.names.append("BADBADBAD" + name.decode("utf-8", errors="ignore"))
         else:
-            self.name_map_size = self.data.decode_uleb128("name_map_size")  # gets the size of the name map
+            self.name_map_size = self.data.ReadUleb("name_map_size")  # gets the size of the name map
             self.names = [x.decode("utf-8") for x in
-                          self.data.fetch((self.name_map_size - 1) * 8, "names").split(b"\x00")]
+                          self.data.ReadBits((self.name_map_size - 1) * 8, "names").split(b"\x00")]
             # print(self.names)
-            self.data.advance(8)  # it only fetches size - 1 for speed to reduce slicing
+            self.data.IgnoreBytes(8)  # it only fetches size - 1 for speed to reduce slicing
             if len(self.names) != self.names_in_name_map:
                 print("RED ALERT")
-        self.num_of_blocks = self.data.decode_uleb128("num_of_blocks")
-        self.num_of_params = self.data.decode_uleb128("num_of_params")
-        self.params_data_size = self.data.decode_uleb128("param_data_size")
-        self.params_data = self.data.fetch(self.params_data_size * 8, "param_data")  # used later on, data
+        self.num_of_blocks = self.data.ReadUleb("num_of_blocks")
+        self.num_of_params = self.data.ReadUleb("num_of_params")
+        self.params_data_size = self.data.ReadUleb("param_data_size")
+        self.params_data = self.data.ReadBits(self.params_data_size * 8, "param_data")  # used later on, data
         '''
         here we are are skipping results creation and starting with chunks
         assume we are doing let chunks
@@ -65,16 +70,16 @@ class BlkParser:
         chunks = []
         parser = ChunkParser(self.names, BLKTypes(self.names, self.params_data))
         for i in range(self.num_of_params):
-            chunks.append(parser.parse(self.data.fetch(8 * 8, "chunk")))
+            chunks.append(parser.parse(self.data.ReadBits(8 * 8, "chunk")))
 
         # chunks = Chunks(self.data, self.num_of_params, self.names, B)
         blocks = []
         for i in range(self.num_of_blocks):  # this creates all the blocks
-            name_id = self.data.decode_uleb128("blk_name_Id")
-            param_count = self.data.decode_uleb128("blk_param_count")
-            block_count = self.data.decode_uleb128("blk_block_count")
+            name_id = self.data.ReadUleb("blk_name_Id")
+            param_count = self.data.ReadUleb("blk_param_count")
+            block_count = self.data.ReadUleb("blk_block_count")
             if block_count > 0:
-                first_block_id = self.data.decode_uleb128("blk_first_blk_Id")
+                first_block_id = self.data.ReadUleb("blk_first_blk_Id")
             else:
                 first_block_id = -1
 
@@ -125,9 +130,11 @@ class BlkBytes:
         self.bytes = bytearray()
         if type(dat) is not BitStream:
             dat = BitStream(dat)
+
+        start_index = dat.GetReadOffset()
         dat.advance(offset * 8)
         self.data = None
-        x = dat.fetch(8, "blk_type")
+        x = dat.ReadBits(8, "blk_type")
         self.blkType = FileType(x[0])  # gets blk type, the first byte
         self.bytes.extend(x)
         if self.blkType == FileType.BBF:
@@ -152,7 +159,7 @@ class BlkBytes:
             self.bytes += temp
 
             # self.names = [x.decode("utf-8") for x in self.data.fetch(self.name_map_size - 1).split(b"\x00")]
-            self.bytes += self.data.fetch(self.name_map_size * 8)
+            self.bytes += self.data.ReadBits(self.name_map_size * 8)
             # print(self.names)
             # self.data.advance(1)
             # if len(self.names) != self.names_in_name_map:
@@ -165,7 +172,7 @@ class BlkBytes:
         self.params_data_size, temp = self.data.decode_uleb128_bytes()
         self.bytes += temp
         # self.params_data = self.data.fetch(self.params_data_size)  # used later on, data
-        self.bytes += self.data.fetch(self.params_data_size * 8)
+        self.bytes += self.data.ReadBits(self.params_data_size * 8)
         '''
         here we are are skipping results creation and starting with chunks
         assume we are doing let chunks
@@ -174,7 +181,7 @@ class BlkBytes:
         # parser = ChunkParser(self.names, BLKTypes(self.names, self.params_data))
         # for i in range(self.num_of_params):
         #     chunks.append(parser.parse(self.data.fetch(8)))
-        self.bytes += self.data.fetch(self.num_of_params * 8 * 8)
+        self.bytes += self.data.ReadBits(self.num_of_params * 8 * 8)
         # chunks = Chunks(self.data, self.num_of_params, self.names, B)
         # blocks = []
         for i in range(self.num_of_blocks):  # this creates all the blocks

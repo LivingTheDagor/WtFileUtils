@@ -2,11 +2,10 @@ import os
 import zstandard as zstd
 import _md5
 import traceback
-import csv
 from itertools import batched
 
 
-from ..DataHandler import DataHandler
+from ..BitStream import BitStream
 from ..vromfs.FileInfoUtils import HeaderType, PlatformType, Packing, Version
 from ..Exceptions import VROMFSException
 from ..FileSystem.FSDirectory import FSDirectory
@@ -71,9 +70,10 @@ class VROMFs:
         """
         if self._raw is None:
             self._raw = _RawData(self.path)
-        data = DataHandler(self._raw.inner_data, 0, False)
+
+        data = BitStream(self._raw.inner_data)
         has_digest = False  # currently not used, its truthiness is still calculated
-        names_header = data.fetch(4)
+        names_header = data.ReadBytes(4)
         match (names_header[0]):
             case 0x20:
                 has_digest = False
@@ -83,12 +83,12 @@ class VROMFs:
                 pass
                 #raise VROMFSException("Bad file type")
         names_offset = int.from_bytes(names_header, byteorder='little')
-        names_count = data.get_int()
-        data.advance(8)  # advances a u64
+        names_count = data.ReadU32()
+        data.IgnoreBytes(8)  # advances a u64
 
-        data_info_offset = data.get_int()
-        data_info_count = data.get_int()
-        data.advance(8)
+        data_info_offset = data.ReadU32()
+        data_info_count = data.ReadU32()
+        data.IgnoreBytes(8)
         if has_digest:
             pass  # not implemented
 
@@ -118,11 +118,13 @@ class VROMFs:
                 _names_digest = raw[0:8]
                 _dict_digest = raw[8:40]
                 zstd_data = raw[40:]
-                raw_nm = DataHandler(zstd.decompress(zstd_data), 0, False)
-                names_count = raw_nm.decode_uleb128()
-                names_data_size = raw_nm.decode_uleb128()
+                raw_nm = BitStream(zstd.decompress(zstd_data))
+                # raw_nm = DataHandler(zstd.decompress(zstd_data), 0, False)
+                names_count = raw_nm.ReadUleb()
+                names_data_size = raw_nm.ReadUleb()
 
-                names = raw_nm.fetch(names_data_size).split(b"\x00")[:-1]
+                names = raw_nm.ReadBytes(names_data_size).split(b"\x00")[:-1]
+
                 if len(names) != names_count:
                     raise VROMFSException("Bad Name Map")
                 self._name_map = names
@@ -158,9 +160,9 @@ class VROMFs:
                     try:
                         data = BlkParser(raw, name_map=self._name_map, zstd_dict=self._zstd_dict).to_dict()
                         x = data.get("root", None)
-                        if x is None:
-                            print(raw)
-                            input()
+                        # if x is None:
+                        #     print(raw)
+                        #     input()
                     except Exception:
                         stack_trace = traceback.format_exc()
                         print(f"blk read error on {file.file_name}, name_map: {self._name_map is not None}, zstd_dict: {self._zstd_dict is not None}")
@@ -191,34 +193,34 @@ class _RawData:
     def __init__(self, path):
         self.metaData = None
         with open(path, 'rb') as f:
-            raw = DataHandler(bytearray(f.read()), 0, False)
+            raw = BitStream(f.read())
         self.inner_data = self._get_inner(raw)
 
     '''
     returns the inner data
     '''
 
-    def _get_inner(self, raw: DataHandler):
-        header_type = HeaderType[raw.get_int()]
-        platform = PlatformType[raw.get_int()]
-        file_size_before_compression = raw.get_int()
-        pack_raw = raw.get_int()
+    def _get_inner(self, raw: BitStream):
+        header_type = HeaderType[raw.ReadU32()]
+        platform = PlatformType[raw.ReadU32()]
+        file_size_before_compression = raw.ReadU32()
+        pack_raw = raw.ReadU32()
         packing = Packing(pack_raw >> 26)  # the first 6 bits (far left) determine packing info
         pack_size = pack_raw & self.size_mask  # last 26 bits
 
         inner_data = None
         if header_type == "VRFX":
-            raw.advance(4)
-            version = Version(raw.fetch(4))
+            raw.IgnoreBytes(4)
+            version = Version(raw.ReadBytes(4))
             if pack_size == 0:
-                inner_data = raw.get_rest()
+                inner_data = raw.ReadRemaining()
             else:
-                inner_data = raw.fetch(pack_size)
+                inner_data = raw.ReadBytes(pack_size)
         else:
             if packing.has_zstd_obfs():  # compressed types only
-                inner_data = raw.fetch(pack_size)
+                inner_data = raw.ReadBytes(pack_size)
             else:
-                inner_data = raw.fetch(file_size_before_compression)
+                inner_data = raw.ReadBytes(file_size_before_compression)
 
         if not packing.has_zstd_obfs():
             return inner_data
@@ -226,7 +228,7 @@ class _RawData:
         output = zstd.decompress(self.deobfuscate(inner_data))  # every zstd packed type is also obfuscated
 
         if packing.has_digest():  # checking for hash
-            h = raw.fetch(16)
+            h = raw.ReadBytes(16)
             hash_calc = _md5.md5(output).digest()
             if hash_calc != h:
                 raise VROMFSException("Invalid MD5 hash")
