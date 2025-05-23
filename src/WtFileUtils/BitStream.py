@@ -2,9 +2,9 @@ import struct
 
 try:
     import sys
-
+    # raise ImportError
     sys.path.append(r"D:\cpp\PersonBLK\cmake-build-debug\cPython")
-    from BitStreama import BitStream
+    from BitStream import BitStream
 except ImportError:
     import io
     import copy
@@ -68,7 +68,7 @@ except ImportError:
         def __init__(self, data):
             self.__data = bytearray(data)  # easier for writing
             self.__bitsAllocated = self.bytes2bits(len(data))
-            self.__bitsUsed = len(data)  # also write offset
+            self.__bitsUsed = self.__bitsAllocated  # also write offset
             self.__readOffset = 0
 
         def Reset(self):
@@ -102,7 +102,7 @@ except ImportError:
             self.__readOffset += min(bits, self.__bitsUsed - self.__readOffset)
 
         def IgnoreBytes(self, bytes_: int):
-            self.IgnoreBytes(self.bytes2bits(bytes_))
+            self.IgnoreBits(self.bytes2bits(bytes_))
 
         def SetWriteOffset(self, offs: int):
             self.__bitsUsed = offs
@@ -123,14 +123,15 @@ except ImportError:
 
         def ReadBits(self, bits) -> bytes | None:
             if bits == 0:
-                return None
+                return b""
             if self.__readOffset + bits > self.__bitsAllocated:
                 return None
 
             dataPtr = 0
             readMod8 = self.__readOffset & 7
             if readMod8 == 0 and (bits & 7) == 0:  # everything byte aligned
-                temp = self.__data[dataPtr:dataPtr + self.bits2bytes(bits)]
+                r_off = self.bits2bytes(self.__readOffset)
+                temp = self.__data[dataPtr+r_off:dataPtr+r_off + self.bits2bytes(bits)]
                 self.__readOffset += bits
                 return bytes(temp)
 
@@ -203,7 +204,8 @@ except ImportError:
             self.WriteBits(input_, self.bytes2bits(lenInBytes))
 
         def Read(self, lenInBytes: int):
-            return self.ReadBits(self.bytes2bits(lenInBytes))
+            out = self.ReadBits(self.bytes2bits(lenInBytes))
+            return out
 
         def WriteCompressed(self, v: int):
             while True:
@@ -225,7 +227,7 @@ except ImportError:
                 count += 1
                 if (byte_ & (1 << 7)) == 0:
                     break
-            return count
+            return v
 
         def writeString(self, t: bytes):
             self.WriteCompressed(len(t))
@@ -285,21 +287,21 @@ except ImportError:
                 return None
             return bytes_[0]
 
-        def readU16(self, message=""):
+        def ReadU16(self, message=""):
             self.__write_message(message, "u16", 16, self.bs.GetReadOffset())
             bytes_ = self.bs.Read(2)
             if bytes_ is None:
                 return None
             return struct.unpack("<H", bytes_)[0]
 
-        def readU32(self, message=""):
+        def ReadU32(self, message=""):
             self.__write_message(message, "u32", 32, self.bs.GetReadOffset())
             bytes_ = self.bs.Read(4)
             if bytes_ is None:
                 return None
             return struct.unpack("<I", bytes_)[0]
 
-        def readU64(self, message=""):
+        def ReadU64(self, message=""):
             self.__write_message(message, "u64", 64, self.bs.GetReadOffset())
             bytes_ = self.bs.Read(8)
             if bytes_ is None:
@@ -353,6 +355,7 @@ except ImportError:
 
         def ReadBytes(self, bytes_: int, message=""):
             self.__write_message(message, "bytes", bytes_ << 8, self.bs.GetReadOffset())
+
             return self.bs.Read(bytes_)
 
         def ReadBits(self, bits: int, message=""):
@@ -400,9 +403,14 @@ except ImportError:
             self.bs.reserveBits(bits)
 
         def read(self, size: int = -1):
+            # print(size)
             if size == -1:
                 return self.ReadRemaining("read_readRemaining")
-            return self.ReadBytes(size, "read_read")
+            payload = self.ReadBytes(size, "read_read")
+            if payload is None:
+                out = self.ReadRemaining("read_read_failed")
+                return out
+            return payload
 
         def WriteBits(self, data, bits):
             self.bs.WriteBits(data, bits)

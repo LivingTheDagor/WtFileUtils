@@ -1,4 +1,4 @@
-from WtFileUtils.vromfs_test.VROMFs import VROMFs
+from WtFileUtils.vromfs.VROMFs import VROMFs
 from WtFileUtils.FileSystem.FSDirectory import FSDirectory
 from WtFileUtils.FileSystem.FileSystemQuery import MassFileSystemQuery
 import os
