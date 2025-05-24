@@ -1,6 +1,6 @@
 [project]
 name = "WtFileUtils"
-version = "0.0.1"
+version = "0.1.4"
 authors = [
   { name="LivingTheDagor", email="LivingTheDagor@gmail.com" },
 ]

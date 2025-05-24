@@ -1,10 +1,11 @@
 import struct
-
+isCPP = False
 try:
     import sys
     # raise ImportError
     sys.path.append(r"D:\cpp\PersonBLK\cmake-build-debug\cPython")
     from BitStream import BitStream
+    isCPP = True
 except ImportError:
     import io
     import copy
