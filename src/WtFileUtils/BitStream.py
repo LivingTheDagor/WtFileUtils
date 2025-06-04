@@ -281,7 +281,7 @@ except ImportError:
         def Flush(self):
             self.ws.flush()
 
-        def readU8(self, message=""):
+        def ReadU8(self, message=""):
             self.__write_message(message, "u8", 8, self.bs.GetReadOffset())
             bytes_ = self.bs.Read(1)
             if bytes_ is None:
